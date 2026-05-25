@@ -1,0 +1,64 @@
+{
+  "id": "inventrio-realm",
+  "realm": "inventrio-realm",
+  "enabled": true,
+  "roles": {
+    "realm": [
+      {
+        "name": "Admin",
+        "description": "Administrator role with full write access"
+      },
+      {
+        "name": "User",
+        "description": "Regular user role with read-only access"
+      }
+    ]
+  },
+  "users": [
+    {
+      "username": "admin",
+      "enabled": true,
+      "email": "admin@inventrio.com",
+      "firstName": "Admin",
+      "lastName": "User",
+      "credentials": [
+        {
+          "type": "password",
+          "value": "admin123",
+          "temporary": false
+        }
+      ],
+      "realmRoles": [
+        "Admin"
+      ]
+    },
+    {
+      "username": "user",
+      "enabled": true,
+      "email": "user@inventrio.com",
+      "firstName": "Regular",
+      "lastName": "User",
+      "credentials": [
+        {
+          "type": "password",
+          "value": "user123",
+          "temporary": false
+        }
+      ],
+      "realmRoles": [
+        "User"
+      ]
+    }
+  ],
+  "clients": [
+    {
+      "clientId": "inventrio-client",
+      "enabled": true,
+      "publicClient": true,
+      "directAccessGrantsEnabled": true,
+      "webOrigins": ["*"],
+      "redirectUris": ["*"],
+      "standardFlowEnabled": true
+    }
+  ]
+}

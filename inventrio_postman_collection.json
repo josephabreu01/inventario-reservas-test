@@ -1,0 +1,650 @@
+{
+	"info": {
+		"_postman_id": "848bb2bd-d2c6-43b9-bb20-6d421d0a514d",
+		"name": "Inventrio Microservices Collection",
+		"description": "Colección de Postman para probar el sistema de microservicios de gestión de inventarios y productos protegido con Keycloak a través de Nginx API Gateway.",
+		"schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
+	},
+	"item": [
+		{
+			"name": "Autenticación (Keycloak)",
+			"item": [
+				{
+					"name": "Obtener Token Admin",
+					"event": [
+						{
+							"listen": "test",
+							"script": {
+								"exec": [
+									"var jsonData = pm.response.json();",
+									"pm.collectionVariables.set(\"admin_token\", jsonData.access_token);"
+								],
+								"type": "text/javascript"
+							}
+						}
+					],
+					"request": {
+						"method": "POST",
+						"header": [],
+						"body": {
+							"mode": "urlencoded",
+							"urlencoded": [
+								{ "key": "username", "value": "admin", "type": "text" },
+								{ "key": "password", "value": "admin123", "type": "text" },
+								{ "key": "grant_type", "value": "password", "type": "text" },
+								{ "key": "client_id", "value": "inventrio-client", "type": "text" }
+							]
+						},
+						"url": {
+							"raw": "{{gateway_url}}/realms/inventrio-realm/protocol/openid-connect/token",
+							"host": ["{{gateway_url}}"],
+							"path": ["realms", "inventrio-realm", "protocol", "openid-connect", "token"]
+						}
+					},
+					"response": []
+				},
+				{
+					"name": "Obtener Token User",
+					"event": [
+						{
+							"listen": "test",
+							"script": {
+								"exec": [
+									"var jsonData = pm.response.json();",
+									"pm.collectionVariables.set(\"user_token\", jsonData.access_token);"
+								],
+								"type": "text/javascript"
+							}
+						}
+					],
+					"request": {
+						"method": "POST",
+						"header": [],
+						"body": {
+							"mode": "urlencoded",
+							"urlencoded": [
+								{ "key": "username", "value": "user", "type": "text" },
+								{ "key": "password", "value": "user123", "type": "text" },
+								{ "key": "grant_type", "value": "password", "type": "text" },
+								{ "key": "client_id", "value": "inventrio-client", "type": "text" }
+							]
+						},
+						"url": {
+							"raw": "{{gateway_url}}/realms/inventrio-realm/protocol/openid-connect/token",
+							"host": ["{{gateway_url}}"],
+							"path": ["realms", "inventrio-realm", "protocol", "openid-connect", "token"]
+						}
+					},
+					"response": []
+				}
+			]
+		},
+		{
+			"name": "Productos (Product Service)",
+			"item": [
+				{
+					"name": "Crear Producto (Admin)",
+					"request": {
+						"auth": {
+							"type": "bearer",
+							"bearer": [
+								{ "key": "token", "value": "{{admin_token}}", "type": "string" }
+							]
+						},
+						"method": "POST",
+						"header": [],
+						"body": {
+							"mode": "raw",
+							"raw": "{\n    \"name\": \"Teclado Mecánico RGB\",\n    \"description\": \"Teclado mecánico con switches red y retroiluminación RGB\",\n    \"price\": 89.99,\n    \"category\": \"Periféricos\",\n    \"sku\": \"KB-RGB-01\"\n}",
+							"options": { "raw": { "language": "json" } }
+						},
+						"url": {
+							"raw": "{{gateway_url}}/api/products",
+							"host": ["{{gateway_url}}"],
+							"path": ["api", "products"]
+						}
+					},
+					"response": []
+				},
+				{
+					"name": "Crear Producto - Validación 400 (campos vacíos)",
+					"request": {
+						"auth": {
+							"type": "bearer",
+							"bearer": [
+								{ "key": "token", "value": "{{admin_token}}", "type": "string" }
+							]
+						},
+						"method": "POST",
+						"header": [],
+						"body": {
+							"mode": "raw",
+							"raw": "{\n    \"name\": \"\",\n    \"description\": \"\",\n    \"price\": -5,\n    \"category\": \"\",\n    \"sku\": \"\"\n}",
+							"options": { "raw": { "language": "json" } }
+						},
+						"url": {
+							"raw": "{{gateway_url}}/api/products",
+							"host": ["{{gateway_url}}"],
+							"path": ["api", "products"]
+						}
+					},
+					"response": []
+				},
+				{
+					"name": "Intentar Crear Producto (User - Debería dar 403)",
+					"request": {
+						"auth": {
+							"type": "bearer",
+							"bearer": [
+								{ "key": "token", "value": "{{user_token}}", "type": "string" }
+							]
+						},
+						"method": "POST",
+						"header": [],
+						"body": {
+							"mode": "raw",
+							"raw": "{\n    \"name\": \"Producto Prohibido\",\n    \"description\": \"Intento no autorizado\",\n    \"price\": 99.99,\n    \"category\": \"Test\",\n    \"sku\": \"PROH-01\"\n}",
+							"options": { "raw": { "language": "json" } }
+						},
+						"url": {
+							"raw": "{{gateway_url}}/api/products",
+							"host": ["{{gateway_url}}"],
+							"path": ["api", "products"]
+						}
+					},
+					"response": []
+				},
+				{
+					"name": "Listar Todos los Productos (User)",
+					"request": {
+						"auth": {
+							"type": "bearer",
+							"bearer": [
+								{ "key": "token", "value": "{{user_token}}", "type": "string" }
+							]
+						},
+						"method": "GET",
+						"header": [],
+						"url": {
+							"raw": "{{gateway_url}}/api/products",
+							"host": ["{{gateway_url}}"],
+							"path": ["api", "products"]
+						}
+					},
+					"response": []
+				},
+				{
+					"name": "Listar Productos Paginados (User)",
+					"request": {
+						"auth": {
+							"type": "bearer",
+							"bearer": [
+								{ "key": "token", "value": "{{user_token}}", "type": "string" }
+							]
+						},
+						"method": "GET",
+						"header": [],
+						"url": {
+							"raw": "{{gateway_url}}/api/products?page=0&size=5",
+							"host": ["{{gateway_url}}"],
+							"path": ["api", "products"],
+							"query": [
+								{ "key": "page", "value": "0" },
+								{ "key": "size", "value": "5" }
+							]
+						}
+					},
+					"response": []
+				},
+				{
+					"name": "Listar Productos Convertidos a EUR (User)",
+					"request": {
+						"auth": {
+							"type": "bearer",
+							"bearer": [
+								{ "key": "token", "value": "{{user_token}}", "type": "string" }
+							]
+						},
+						"method": "GET",
+						"header": [],
+						"url": {
+							"raw": "{{gateway_url}}/api/products?currency=EUR",
+							"host": ["{{gateway_url}}"],
+							"path": ["api", "products"],
+							"query": [
+								{ "key": "currency", "value": "EUR" }
+							]
+						}
+					},
+					"response": []
+				},
+				{
+					"name": "Listar Productos por Categoría (User)",
+					"request": {
+						"auth": {
+							"type": "bearer",
+							"bearer": [
+								{ "key": "token", "value": "{{user_token}}", "type": "string" }
+							]
+						},
+						"method": "GET",
+						"header": [],
+						"url": {
+							"raw": "{{gateway_url}}/api/products?category=Periféricos",
+							"host": ["{{gateway_url}}"],
+							"path": ["api", "products"],
+							"query": [
+								{ "key": "category", "value": "Periféricos" }
+							]
+						}
+					},
+					"response": []
+				},
+				{
+					"name": "Listar Productos por Categoría con EUR (User)",
+					"request": {
+						"auth": {
+							"type": "bearer",
+							"bearer": [
+								{ "key": "token", "value": "{{user_token}}", "type": "string" }
+							]
+						},
+						"method": "GET",
+						"header": [],
+						"url": {
+							"raw": "{{gateway_url}}/api/products?category=Periféricos&currency=EUR",
+							"host": ["{{gateway_url}}"],
+							"path": ["api", "products"],
+							"query": [
+								{ "key": "category", "value": "Periféricos" },
+								{ "key": "currency", "value": "EUR" }
+							]
+						}
+					},
+					"response": []
+				},
+				{
+					"name": "Obtener Producto por ID (User)",
+					"request": {
+						"auth": {
+							"type": "bearer",
+							"bearer": [
+								{ "key": "token", "value": "{{user_token}}", "type": "string" }
+							]
+						},
+						"method": "GET",
+						"header": [],
+						"url": {
+							"raw": "{{gateway_url}}/api/products/1",
+							"host": ["{{gateway_url}}"],
+							"path": ["api", "products", "1"]
+						}
+					},
+					"response": []
+				},
+				{
+					"name": "Obtener Producto por ID con EUR (User)",
+					"request": {
+						"auth": {
+							"type": "bearer",
+							"bearer": [
+								{ "key": "token", "value": "{{user_token}}", "type": "string" }
+							]
+						},
+						"method": "GET",
+						"header": [],
+						"url": {
+							"raw": "{{gateway_url}}/api/products/1?currency=EUR",
+							"host": ["{{gateway_url}}"],
+							"path": ["api", "products", "1"],
+							"query": [
+								{ "key": "currency", "value": "EUR" }
+							]
+						}
+					},
+					"response": []
+				},
+				{
+					"name": "Obtener Producto por ID - No Encontrado 404",
+					"request": {
+						"auth": {
+							"type": "bearer",
+							"bearer": [
+								{ "key": "token", "value": "{{user_token}}", "type": "string" }
+							]
+						},
+						"method": "GET",
+						"header": [],
+						"url": {
+							"raw": "{{gateway_url}}/api/products/9999",
+							"host": ["{{gateway_url}}"],
+							"path": ["api", "products", "9999"]
+						}
+					},
+					"response": []
+				},
+				{
+					"name": "Actualizar Producto (Admin)",
+					"request": {
+						"auth": {
+							"type": "bearer",
+							"bearer": [
+								{ "key": "token", "value": "{{admin_token}}", "type": "string" }
+							]
+						},
+						"method": "PUT",
+						"header": [],
+						"body": {
+							"mode": "raw",
+							"raw": "{\n    \"name\": \"Teclado Mecánico RGB Actualizado\",\n    \"description\": \"Teclado mecánico con switches red, retroiluminación RGB y cable extraíble\",\n    \"price\": 94.99,\n    \"category\": \"Periféricos\",\n    \"sku\": \"KB-RGB-01\"\n}",
+							"options": { "raw": { "language": "json" } }
+						},
+						"url": {
+							"raw": "{{gateway_url}}/api/products/1",
+							"host": ["{{gateway_url}}"],
+							"path": ["api", "products", "1"]
+						}
+					},
+					"response": []
+				},
+				{
+					"name": "Eliminar Producto (Admin)",
+					"request": {
+						"auth": {
+							"type": "bearer",
+							"bearer": [
+								{ "key": "token", "value": "{{admin_token}}", "type": "string" }
+							]
+						},
+						"method": "DELETE",
+						"header": [],
+						"url": {
+							"raw": "{{gateway_url}}/api/products/1",
+							"host": ["{{gateway_url}}"],
+							"path": ["api", "products", "1"]
+						}
+					},
+					"response": []
+				},
+				{
+					"name": "Consultar Stock desde Catálogo (User)",
+					"request": {
+						"auth": {
+							"type": "bearer",
+							"bearer": [
+								{ "key": "token", "value": "{{user_token}}", "type": "string" }
+							]
+						},
+						"method": "GET",
+						"header": [],
+						"url": {
+							"raw": "{{gateway_url}}/api/products/1/stock",
+							"host": ["{{gateway_url}}"],
+							"path": ["api", "products", "1", "stock"]
+						}
+					},
+					"response": []
+				},
+				{
+					"name": "Ver Historial de Precios (User)",
+					"request": {
+						"auth": {
+							"type": "bearer",
+							"bearer": [
+								{ "key": "token", "value": "{{user_token}}", "type": "string" }
+							]
+						},
+						"method": "GET",
+						"header": [],
+						"url": {
+							"raw": "{{gateway_url}}/api/products/1/price-history",
+							"host": ["{{gateway_url}}"],
+							"path": ["api", "products", "1", "price-history"]
+						}
+					},
+					"response": []
+				},
+				{
+					"name": "Ver Historial de Precios Paginado (User)",
+					"request": {
+						"auth": {
+							"type": "bearer",
+							"bearer": [
+								{ "key": "token", "value": "{{user_token}}", "type": "string" }
+							]
+						},
+						"method": "GET",
+						"header": [],
+						"url": {
+							"raw": "{{gateway_url}}/api/products/1/price-history?page=0&size=5",
+							"host": ["{{gateway_url}}"],
+							"path": ["api", "products", "1", "price-history"],
+							"query": [
+								{ "key": "page", "value": "0" },
+								{ "key": "size", "value": "5" }
+							]
+						}
+					},
+					"response": []
+				}
+			]
+		},
+		{
+			"name": "Inventario (Inventory Service)",
+			"item": [
+				{
+					"name": "Consultar Todo el Inventario (User)",
+					"request": {
+						"auth": {
+							"type": "bearer",
+							"bearer": [
+								{ "key": "token", "value": "{{user_token}}", "type": "string" }
+							]
+						},
+						"method": "GET",
+						"header": [],
+						"url": {
+							"raw": "{{gateway_url}}/api/inventory",
+							"host": ["{{gateway_url}}"],
+							"path": ["api", "inventory"]
+						}
+					},
+					"response": []
+				},
+				{
+					"name": "Consultar Stock de un Producto (User)",
+					"request": {
+						"auth": {
+							"type": "bearer",
+							"bearer": [
+								{ "key": "token", "value": "{{user_token}}", "type": "string" }
+							]
+						},
+						"method": "GET",
+						"header": [],
+						"url": {
+							"raw": "{{gateway_url}}/api/inventory/1",
+							"host": ["{{gateway_url}}"],
+							"path": ["api", "inventory", "1"]
+						}
+					},
+					"response": []
+				},
+				{
+					"name": "Consultar Stock - No Encontrado 404",
+					"request": {
+						"auth": {
+							"type": "bearer",
+							"bearer": [
+								{ "key": "token", "value": "{{user_token}}", "type": "string" }
+							]
+						},
+						"method": "GET",
+						"header": [],
+						"url": {
+							"raw": "{{gateway_url}}/api/inventory/9999",
+							"host": ["{{gateway_url}}"],
+							"path": ["api", "inventory", "9999"]
+						}
+					},
+					"response": []
+				},
+				{
+					"name": "Ajustar Stock - Entrada ENTRY (Admin)",
+					"request": {
+						"auth": {
+							"type": "bearer",
+							"bearer": [
+								{ "key": "token", "value": "{{admin_token}}", "type": "string" }
+							]
+						},
+						"method": "POST",
+						"header": [],
+						"body": {
+							"mode": "raw",
+							"raw": "{\n    \"productId\": 1,\n    \"quantity\": 50,\n    \"type\": \"ENTRY\"\n}",
+							"options": { "raw": { "language": "json" } }
+						},
+						"url": {
+							"raw": "{{gateway_url}}/api/inventory/adjust",
+							"host": ["{{gateway_url}}"],
+							"path": ["api", "inventory", "adjust"]
+						}
+					},
+					"response": []
+				},
+				{
+					"name": "Ajustar Stock - Salida EXIT (Admin)",
+					"request": {
+						"auth": {
+							"type": "bearer",
+							"bearer": [
+								{ "key": "token", "value": "{{admin_token}}", "type": "string" }
+							]
+						},
+						"method": "POST",
+						"header": [],
+						"body": {
+							"mode": "raw",
+							"raw": "{\n    \"productId\": 1,\n    \"quantity\": 10,\n    \"type\": \"EXIT\"\n}",
+							"options": { "raw": { "language": "json" } }
+						},
+						"url": {
+							"raw": "{{gateway_url}}/api/inventory/adjust",
+							"host": ["{{gateway_url}}"],
+							"path": ["api", "inventory", "adjust"]
+						}
+					},
+					"response": []
+				},
+				{
+					"name": "Ajustar Stock - Validación 400 (cantidad negativa)",
+					"request": {
+						"auth": {
+							"type": "bearer",
+							"bearer": [
+								{ "key": "token", "value": "{{admin_token}}", "type": "string" }
+							]
+						},
+						"method": "POST",
+						"header": [],
+						"body": {
+							"mode": "raw",
+							"raw": "{\n    \"productId\": 1,\n    \"quantity\": -5,\n    \"type\": \"ENTRY\"\n}",
+							"options": { "raw": { "language": "json" } }
+						},
+						"url": {
+							"raw": "{{gateway_url}}/api/inventory/adjust",
+							"host": ["{{gateway_url}}"],
+							"path": ["api", "inventory", "adjust"]
+						}
+					},
+					"response": []
+				},
+				{
+					"name": "Intentar Ajustar Stock (User - Debería dar 403)",
+					"request": {
+						"auth": {
+							"type": "bearer",
+							"bearer": [
+								{ "key": "token", "value": "{{user_token}}", "type": "string" }
+							]
+						},
+						"method": "POST",
+						"header": [],
+						"body": {
+							"mode": "raw",
+							"raw": "{\n    \"productId\": 1,\n    \"quantity\": 10,\n    \"type\": \"ENTRY\"\n}",
+							"options": { "raw": { "language": "json" } }
+						},
+						"url": {
+							"raw": "{{gateway_url}}/api/inventory/adjust",
+							"host": ["{{gateway_url}}"],
+							"path": ["api", "inventory", "adjust"]
+						}
+					},
+					"response": []
+				},
+				{
+					"name": "Ver Historial de Movimientos (User)",
+					"request": {
+						"auth": {
+							"type": "bearer",
+							"bearer": [
+								{ "key": "token", "value": "{{user_token}}", "type": "string" }
+							]
+						},
+						"method": "GET",
+						"header": [],
+						"url": {
+							"raw": "{{gateway_url}}/api/inventory/1/movements",
+							"host": ["{{gateway_url}}"],
+							"path": ["api", "inventory", "1", "movements"]
+						}
+					},
+					"response": []
+				},
+				{
+					"name": "Ver Historial de Movimientos Paginado (User)",
+					"request": {
+						"auth": {
+							"type": "bearer",
+							"bearer": [
+								{ "key": "token", "value": "{{user_token}}", "type": "string" }
+							]
+						},
+						"method": "GET",
+						"header": [],
+						"url": {
+							"raw": "{{gateway_url}}/api/inventory/1/movements?page=0&size=5",
+							"host": ["{{gateway_url}}"],
+							"path": ["api", "inventory", "1", "movements"],
+							"query": [
+								{ "key": "page", "value": "0" },
+								{ "key": "size", "value": "5" }
+							]
+						}
+					},
+					"response": []
+				}
+			]
+		}
+	],
+	"variable": [
+		{
+			"key": "gateway_url",
+			"value": "http://localhost:8080",
+			"type": "string"
+		},
+		{
+			"key": "admin_token",
+			"value": "",
+			"type": "string"
+		},
+		{
+			"key": "user_token",
+			"value": "",
+			"type": "string"
+		}
+	]
+}
