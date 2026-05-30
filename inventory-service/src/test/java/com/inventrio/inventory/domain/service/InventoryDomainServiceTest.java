@@ -34,7 +34,7 @@ public class InventoryDomainServiceTest {
         Inventory existing = Inventory.builder().id(1L).productId(100L).quantity(50).build();
         Inventory updated = Inventory.builder().id(1L).productId(100L).quantity(70).build();
 
-        when(repository.findInventoryByProductId(100L)).thenReturn(Optional.of(existing));
+        when(repository.findInventoryByProductIdForUpdate(100L)).thenReturn(Optional.of(existing));
         when(repository.saveInventory(any(Inventory.class))).thenReturn(updated);
 
         Inventory result = domainService.adjustStock(100L, 20, MovementType.ENTRY);
@@ -50,7 +50,7 @@ public class InventoryDomainServiceTest {
         Inventory existing = Inventory.builder().id(1L).productId(100L).quantity(50).build();
         Inventory updated = Inventory.builder().id(1L).productId(100L).quantity(30).build();
 
-        when(repository.findInventoryByProductId(100L)).thenReturn(Optional.of(existing));
+        when(repository.findInventoryByProductIdForUpdate(100L)).thenReturn(Optional.of(existing));
         when(repository.saveInventory(any(Inventory.class))).thenReturn(updated);
 
         Inventory result = domainService.adjustStock(100L, 20, MovementType.EXIT);
@@ -65,7 +65,7 @@ public class InventoryDomainServiceTest {
     void testAdjustStock_Exit_InsufficientStock() {
         Inventory existing = Inventory.builder().id(1L).productId(100L).quantity(10).build();
 
-        when(repository.findInventoryByProductId(100L)).thenReturn(Optional.of(existing));
+        when(repository.findInventoryByProductIdForUpdate(100L)).thenReturn(Optional.of(existing));
 
         assertThrows(BadRequestException.class, () -> domainService.adjustStock(100L, 20, MovementType.EXIT));
 
@@ -159,5 +159,55 @@ public class InventoryDomainServiceTest {
 
         assertEquals(2, result.size());
         verify(repository).findAllInventories();
+    }
+
+    @Test
+    void testAdjustStock_ZeroChange_ThrowsBadRequestException() {
+        assertThrows(BadRequestException.class,
+                () -> domainService.adjustStock(100L, 0, MovementType.ENTRY));
+        verify(repository, never()).saveInventory(any());
+    }
+
+    @Test
+    void testAdjustStock_NegativeChange_ThrowsBadRequestException() {
+        assertThrows(BadRequestException.class,
+                () -> domainService.adjustStock(100L, -5, MovementType.ENTRY));
+        verify(repository, never()).saveInventory(any());
+    }
+
+    @Test
+    void testGetStock_Found_ReturnsInventory() {
+        Inventory existing = Inventory.builder().id(1L).productId(100L).quantity(50).build();
+        when(repository.findInventoryByProductId(100L)).thenReturn(Optional.of(existing));
+
+        Inventory result = domainService.getStock(100L);
+
+        assertEquals(50, result.getQuantity());
+        assertEquals(100L, result.getProductId());
+    }
+
+    @Test
+    void testGetMovements_PaginatedVariant_ReturnsList() {
+        Inventory existing = Inventory.builder().id(1L).productId(100L).quantity(50).build();
+        InventoryMovement m1 = InventoryMovement.builder().id(1L).productId(100L).quantityChange(10)
+                .movementType(MovementType.ENTRY).build();
+        InventoryMovement m2 = InventoryMovement.builder().id(2L).productId(100L).quantityChange(5)
+                .movementType(MovementType.EXIT).build();
+
+        when(repository.findInventoryByProductId(100L)).thenReturn(Optional.of(existing));
+        when(repository.findMovementsByProductId(100L, 0, 10)).thenReturn(List.of(m1, m2));
+
+        List<InventoryMovement> result = domainService.getMovements(100L, 0, 10);
+
+        assertEquals(2, result.size());
+        verify(repository).findMovementsByProductId(100L, 0, 10);
+    }
+
+    @Test
+    void testGetMovements_PaginatedVariant_NotFound_ThrowsNotFoundException() {
+        when(repository.findInventoryByProductId(999L)).thenReturn(Optional.empty());
+
+        assertThrows(NotFoundException.class, () -> domainService.getMovements(999L, 0, 10));
+        verify(repository, never()).findMovementsByProductId(any(), anyInt(), anyInt());
     }
 }

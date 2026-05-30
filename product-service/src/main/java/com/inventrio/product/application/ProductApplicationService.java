@@ -17,22 +17,22 @@ public class ProductApplicationService {
 
     public ProductResponse createProduct(ProductRequest request) {
         Product created = useCase.createProduct(toDomain(request));
-        return toResponse(created);
+        return toResponse(created, null);
     }
 
     public List<ProductResponse> getAllProducts(String category, int page, int size, String currency) {
         List<Product> products = (category != null && !category.isBlank())
                 ? useCase.getProductsByCategory(category, page, size, currency)
                 : useCase.getAllProducts(page, size, currency);
-        return products.stream().map(this::toResponse).toList();
+        return products.stream().map(p -> toResponse(p, currency)).toList();
     }
 
     public ProductResponse getProduct(Long id, String currency) {
-        return toResponse(useCase.getProduct(id, currency));
+        return toResponse(useCase.getProduct(id, currency), currency);
     }
 
     public ProductResponse updateProduct(Long id, ProductRequest request) {
-        return toResponse(useCase.updateProduct(id, toDomain(request)));
+        return toResponse(useCase.updateProduct(id, toDomain(request)), null);
     }
 
     public void deleteProduct(Long id) {
@@ -60,9 +60,10 @@ public class ProductApplicationService {
                 .build();
     }
 
-    private ProductResponse toResponse(Product p) {
+    private ProductResponse toResponse(Product p, String currency) {
+        String effectiveCurrency = (currency == null || currency.isBlank()) ? "USD" : currency.toUpperCase();
         return new ProductResponse(p.getId(), p.getName(), p.getDescription(),
-                p.getPrice(), p.getCategory(), p.getSku());
+                p.getPrice(), p.getCategory(), p.getSku(), effectiveCurrency);
     }
 
     private PriceHistoryResponse toPriceHistoryResponse(PriceHistory ph) {

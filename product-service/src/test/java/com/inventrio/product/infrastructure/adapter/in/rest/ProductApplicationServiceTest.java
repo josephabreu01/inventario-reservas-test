@@ -41,6 +41,7 @@ public class ProductApplicationServiceTest {
         assertEquals(1L, response.id());
         assertEquals("Laptop", response.name());
         assertEquals("SKU1", response.sku());
+        assertEquals("USD", response.currency());
         verify(useCase).createProduct(any(Product.class));
     }
 
@@ -87,6 +88,7 @@ public class ProductApplicationServiceTest {
 
         assertEquals(2L, response.id());
         assertEquals("Monitor", response.name());
+        assertEquals("EUR", response.currency());
     }
 
     @Test
@@ -100,6 +102,7 @@ public class ProductApplicationServiceTest {
 
         assertEquals("Monitor Pro", response.name());
         assertEquals(new BigDecimal("600.00"), response.price());
+        assertEquals("USD", response.currency());
     }
 
     @Test
@@ -127,5 +130,37 @@ public class ProductApplicationServiceTest {
 
         assertEquals(1, result.size());
         assertEquals(new BigDecimal("100.00"), result.get(0).price());
+    }
+
+    @Test
+    void getAllProducts_withCurrency_propagatesCurrencyToResponse() {
+        Product p = Product.builder().id(1L).name("Monitor").description("4K")
+                .price(new BigDecimal("450.00")).category("Tech").sku("SKU5").build();
+        when(useCase.getAllProducts(0, 20, "EUR")).thenReturn(List.of(p));
+
+        List<ProductResponse> result = service.getAllProducts(null, 0, 20, "EUR");
+
+        assertEquals(1, result.size());
+        assertEquals("EUR", result.get(0).currency());
+    }
+
+    @Test
+    void getAllProducts_withBlankCurrency_defaultsToUSD() {
+        when(useCase.getAllProducts(0, 20, "  ")).thenReturn(List.of());
+
+        List<ProductResponse> result = service.getAllProducts(null, 0, 20, "  ");
+
+        assertEquals(0, result.size());
+    }
+
+    @Test
+    void getAllProducts_withNullCurrency_defaultsToUSD() {
+        Product p = Product.builder().id(1L).name("Keyboard").description("Mech")
+                .price(new BigDecimal("80.00")).category("Peripherals").sku("SKU6").build();
+        when(useCase.getAllProducts(0, 20, null)).thenReturn(List.of(p));
+
+        List<ProductResponse> result = service.getAllProducts(null, 0, 20, null);
+
+        assertEquals("USD", result.get(0).currency());
     }
 }

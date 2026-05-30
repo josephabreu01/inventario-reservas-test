@@ -3,6 +3,7 @@ package com.inventrio.product.domain.service;
 import static org.junit.jupiter.api.Assertions.*;
 import static org.mockito.Mockito.*;
 
+import com.inventrio.product.domain.exception.BadRequestException;
 import com.inventrio.product.domain.exception.ConflictException;
 import com.inventrio.product.domain.exception.NotFoundException;
 import com.inventrio.product.domain.model.PriceHistory;
@@ -155,5 +156,87 @@ public class ProductDomainServiceTest {
         domainService.syncCurrentStock(99L, 10);
 
         verify(repository, never()).updateCurrentStock(any(), any());
+    }
+
+    @Test
+    void testSyncCurrentStock_NegativeStock_ThrowsBadRequestException() {
+        assertThrows(BadRequestException.class, () -> domainService.syncCurrentStock(1L, -5));
+        verify(repository, never()).updateCurrentStock(any(), any());
+    }
+
+    @Test
+    void testGetAllProducts_WithPagination_ReturnsList() {
+        Product p = Product.builder().id(1L).name("Laptop").description("Gaming")
+                .price(new BigDecimal("100.00")).category("Tech").sku("SKU1").currentStock(5).build();
+        when(repository.findAll(0, 10)).thenReturn(List.of(p));
+
+        List<Product> result = domainService.getAllProducts(0, 10, null);
+
+        assertEquals(1, result.size());
+        assertEquals("Laptop", result.get(0).getName());
+        verify(repository).findAll(0, 10);
+    }
+
+    @Test
+    void testGetAllProducts_WithCurrency_ConvertsPrice() {
+        Product p = Product.builder().id(1L).name("Laptop").description("Gaming")
+                .price(new BigDecimal("100.00")).category("Tech").sku("SKU1").currentStock(5).build();
+        when(repository.findAll(0, 10)).thenReturn(List.of(p));
+        when(exchangeRatePort.getExchangeRate("EUR")).thenReturn(new BigDecimal("0.90"));
+
+        List<Product> result = domainService.getAllProducts(0, 10, "EUR");
+
+        assertEquals(1, result.size());
+        assertEquals(new BigDecimal("90.00"), result.get(0).getPrice());
+        verify(exchangeRatePort).getExchangeRate("EUR");
+    }
+
+    @Test
+    void testGetAllProducts_USDCurrency_DoesNotConvert() {
+        Product p = Product.builder().id(1L).name("Laptop").description("Gaming")
+                .price(new BigDecimal("100.00")).category("Tech").sku("SKU1").currentStock(5).build();
+        when(repository.findAll(0, 10)).thenReturn(List.of(p));
+
+        List<Product> result = domainService.getAllProducts(0, 10, "USD");
+
+        assertEquals(new BigDecimal("100.00"), result.get(0).getPrice());
+        verify(exchangeRatePort, never()).getExchangeRate(any());
+    }
+
+    @Test
+    void testGetProductsByCategory_NoPagination_ReturnsList() {
+        Product p = Product.builder().id(1L).name("Mouse").description("USB")
+                .price(new BigDecimal("25.00")).category("Peripherals").sku("SKU-M").currentStock(10).build();
+        when(repository.findByCategory("Peripherals")).thenReturn(List.of(p));
+
+        List<Product> result = domainService.getProductsByCategory("Peripherals", null);
+
+        assertEquals(1, result.size());
+        verify(repository).findByCategory("Peripherals");
+    }
+
+    @Test
+    void testGetPriceHistory_NoPagination_ReturnsList() {
+        Product product = Product.builder().id(1L).name("Laptop").price(new BigDecimal("100")).sku("S1").build();
+        PriceHistory ph = new PriceHistory(1L, 1L, new BigDecimal("100.00"), null);
+        when(repository.findById(1L)).thenReturn(Optional.of(product));
+        when(repository.findPriceHistoryByProductId(1L)).thenReturn(List.of(ph));
+
+        List<PriceHistory> result = domainService.getPriceHistory(1L);
+
+        assertEquals(1, result.size());
+        verify(repository).findPriceHistoryByProductId(1L);
+    }
+
+    @Test
+    void testGetProduct_NullCurrency_ReturnsOriginalPrice() {
+        Product product = Product.builder().id(1L).name("Laptop").description("Gaming")
+                .price(new BigDecimal("100.00")).category("Tech").sku("SKU1").currentStock(5).build();
+        when(repository.findById(1L)).thenReturn(Optional.of(product));
+
+        Product result = domainService.getProduct(1L, null);
+
+        assertEquals(new BigDecimal("100.00"), result.getPrice());
+        verify(exchangeRatePort, never()).getExchangeRate(any());
     }
 }

@@ -42,6 +42,7 @@ public class InventoryDomainService implements InventoryUseCase {
         repository.saveMovement(new InventoryMovement(null, productId, change, type, LocalDateTime.now()));
         publisher.publishInventoryAdjusted(productId, newQuantity, change, type);
 
+        LOG.infof("Stock adjusted productId=%d type=%s change=%d newQuantity=%d", productId, type, change, newQuantity);
         return updatedInventory;
     }
 
@@ -84,6 +85,7 @@ public class InventoryDomainService implements InventoryUseCase {
                 .category(category)
                 .build();
         repository.saveInventory(inventory);
+        LOG.infof("Inventory initialized productId=%d", productId);
     }
 
     @Override
@@ -93,12 +95,14 @@ public class InventoryDomainService implements InventoryUseCase {
             inventory.setPrice(price);
             inventory.setCategory(category);
             repository.saveInventory(inventory);
+            LOG.debugf("Product details synced in inventory productId=%d name=%s", productId, name);
         });
     }
 
     @Override
     public void removeProductStock(Long productId) {
         repository.deleteInventoryByProductId(productId);
+        LOG.infof("Inventory removed productId=%d", productId);
     }
 
     private int calculateNewQuantity(int current, int change, MovementType type) {

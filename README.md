@@ -80,7 +80,7 @@ flowchart LR
 | **Consumidor idempotente** | Los IDs de eventos se registran en la tabla `processed_event` dentro de una transacción atómica, evitando doble procesamiento en reintentos de Kafka. |
 | **Locking pesimista** | `adjustStock` usa `SELECT FOR UPDATE` (`LockModeType.PESSIMISTIC_WRITE`) para prevenir sobreajuste de stock en requests concurrentes. |
 | **Caché multicapa con TTL** | Listas de productos, detalles, stock e historial cacheados en Redis con TTL explícito por cache. Invalidación automática en escrituras. |
-| **Exception handling** | Excepciones de dominio (`NotFoundException`, `ConflictException`, `BadRequestException`) propagadas sin try/catch en controllers ni Application Services. JAX-RS `ExceptionMapper` las convierte a HTTP. |
+| **Exception handling** | Excepciones de dominio (`NotFoundException`, `ConflictException`, `BadRequestException`) propagadas sin try/catch en controllers ni Application Services. JAX-RS `ExceptionMapper` las convierte a HTTP con log estructurado. `UnhandledExceptionMapper` actúa como fallback para errores inesperados (ej. `PersistenceException`) evitando el 500 vacío por defecto de Quarkus. |
 
 ---
 
@@ -114,7 +114,8 @@ flowchart LR
 | **Serialización** | Jackson (quarkus-rest-jackson) | 3.35.3 |
 | **Utilidades** | Lombok | 1.18.38 |
 | **Testing** | JUnit 5 + Mockito + REST Assured | 3.35.3 |
-| **Cobertura** | JaCoCo (quarkus-jacoco) | 3.35.3 |
+| **Cobertura** | JaCoCo (`quarkus-jacoco` + `jacoco-maven-plugin` 0.8.12) | 3.35.3 / 0.8.12 |
+| **Logging JSON** | `quarkus-logging-json` | 3.35.3 |
 
 ---
 
@@ -449,4 +450,87 @@ cd product-service && mvn test
 cd inventory-service && mvn test
 ```
 
-Los reports de cobertura JaCoCo se generan en `target/jacoco-report/index.html`.
+### Reporte de cobertura JaCoCo
+
+El pipeline de cobertura fusiona dos fuentes para capturar tanto tests `@QuarkusTest` como tests unitarios puros (Mockito):
+
+| Archivo | Origen |
+| :--- | :--- |
+| `target/jacoco-quarkus.exec` | Tests `@QuarkusTest` (runner de Quarkus) |
+| `target/jacoco-unit.exec` | Tests unitarios puros (agente estándar vía `prepare-agent`) |
+| `target/jacoco-merged.exec` | Fusión de ambos (OR lógico por instrucción) |
+
+El reporte filtrado (sin boilerplate) se genera en:
+
+```
+target/jacoco-filtered/index.html
+```
+
+Las siguientes clases quedan excluidas del reporte porque no contienen lógica de negocio: modelos de dominio, excepciones de dominio, DTOs de request/response, mappers de excepciones JAX-RS, entidades JPA, publicadores Kafka y adaptadores de persistencia.
+
+| Servicio | Instrucciones | Branches |
+| :--- | :---: | :---: |
+| product-service | ~85% | ~75% |
+| inventory-service | ~94% | ~100% |
+
+---
+
+## 📋 Logging
+
+El sistema usa **JBoss Logging** (incluido en Quarkus, sin dependencia extra) con `quarkus-logging-json` para formato estructurado en producción.
+
+### Formato por entorno
+
+| Perfil | Formato | Destino |
+| :--- | :--- | :--- |
+| `%dev` | Texto plano legible | Consola |
+| `%prod` | JSON estructurado (una línea por evento) | Consola / `docker logs` |
+
+**Ejemplo de log JSON en producción:**
+```json
+{"timestamp":"2026-05-30T10:00:00Z","level":"INFO","loggerName":"com.inventrio.product.domain.service.ProductDomainService","message":"Product created id=42 SKU=KB-01","threadName":"executor-thread-1"}
+```
+
+### Niveles configurados
+
+```properties
+quarkus.log.category."com.inventrio".level=DEBUG   # código propio: DEBUG+
+quarkus.log.category."io.quarkus".level=WARN        # framework: solo warnings
+quarkus.log.category."org.hibernate".level=WARN     # Hibernate: solo warnings
+```
+
+### Qué se loggea y en qué nivel
+
+| Evento | Nivel | Clase |
+| :--- | :---: | :--- |
+| Producto / inventario creado, actualizado, eliminado | `INFO` | `*DomainService` |
+| Stock ajustado / inicializado / eliminado | `INFO` | `InventoryDomainService` |
+| Evento Kafka recibido y procesado | `INFO` | `*EventConsumer` |
+| Evento duplicado (idempotencia) | `WARN` | `ProductEventConsumer` |
+| Recurso no encontrado (404) | `DEBUG` | `NotFoundExceptionMapper` |
+| Bad request / conflict / validación (4xx) | `WARN` | `*ExceptionMapper` |
+| Excepción no manejada (500) | `ERROR` + stack trace | `UnhandledExceptionMapper` |
+
+---
+
+## 🛡️ Manejo de Excepciones
+
+Cada servicio implementa una jerarquía de `ExceptionMapper` JAX-RS que convierte excepciones de dominio en respuestas HTTP con cuerpo JSON estructurado.
+
+### Mappers registrados
+
+| Mapper | Excepción capturada | HTTP | Nivel de log |
+| :--- | :--- | :---: | :---: |
+| `NotFoundExceptionMapper` | `NotFoundException` | `404` | `DEBUG` |
+| `BadRequestExceptionMapper` | `BadRequestException` | `400` | `WARN` |
+| `ConflictExceptionMapper` | `ConflictException` | `409` | `WARN` |
+| `ConstraintViolationExceptionMapper` | `ConstraintViolationException` (Bean Validation) | `400` | `WARN` |
+| `UnhandledExceptionMapper` | `Exception` (fallback) | `500` | `ERROR` |
+
+El `UnhandledExceptionMapper` actúa como último recurso: captura cualquier `Exception` no manejada (por ejemplo, `PersistenceException` de Hibernate por campo DB faltante) y devuelve una respuesta estructurada en lugar del error vacío por defecto de Quarkus:
+
+```json
+{"message": "An unexpected error occurred. Please try again later."}
+```
+
+La excepción completa con stack trace queda en el log al nivel `ERROR` para diagnóstico.

@@ -10,6 +10,8 @@ import com.inventrio.product.domain.port.out.ExchangeRatePort;
 import com.inventrio.product.domain.port.out.ProductEventPublisherPort;
 import com.inventrio.product.domain.port.out.ProductRepositoryPort;
 
+import org.jboss.logging.Logger;
+
 import java.math.BigDecimal;
 import java.math.RoundingMode;
 import java.time.LocalDateTime;
@@ -17,6 +19,8 @@ import java.util.List;
 import java.util.Objects;
 
 public class ProductDomainService implements ProductUseCase {
+
+    private static final Logger LOG = Logger.getLogger(ProductDomainService.class);
 
     private final ProductRepositoryPort repository;
     private final ProductEventPublisherPort publisher;
@@ -33,6 +37,7 @@ public class ProductDomainService implements ProductUseCase {
     @Override
     public Product createProduct(Product product) {
         if (repository.findBySku(product.getSku()).isPresent()) {
+            LOG.warnf("Create rejected — SKU already exists: %s", product.getSku());
             throw new ConflictException("Product with SKU " + product.getSku() + " already exists");
         }
 
@@ -40,6 +45,7 @@ public class ProductDomainService implements ProductUseCase {
         repository.savePriceHistory(new PriceHistory(null, savedProduct.getId(), savedProduct.getPrice(), LocalDateTime.now()));
         publisher.publishProductCreated(savedProduct);
 
+        LOG.infof("Product created id=%d SKU=%s", savedProduct.getId(), savedProduct.getSku());
         return savedProduct;
     }
 
@@ -50,6 +56,7 @@ public class ProductDomainService implements ProductUseCase {
 
         boolean skuChanged = !existingProduct.getSku().equals(productDetails.getSku());
         if (skuChanged && repository.findBySku(productDetails.getSku()).isPresent()) {
+            LOG.warnf("Update rejected — SKU already exists: %s", productDetails.getSku());
             throw new ConflictException("Product with SKU " + productDetails.getSku() + " already exists");
         }
 
@@ -69,6 +76,7 @@ public class ProductDomainService implements ProductUseCase {
 
         publisher.publishProductUpdated(updatedProduct);
 
+        LOG.infof("Product updated id=%d SKU=%s priceChanged=%b", updatedProduct.getId(), updatedProduct.getSku(), priceChanged);
         return updatedProduct;
     }
 
@@ -78,6 +86,7 @@ public class ProductDomainService implements ProductUseCase {
             throw new NotFoundException("Product not found with ID: " + id);
         }
         publisher.publishProductDeleted(id);
+        LOG.infof("Product deleted id=%d", id);
     }
 
     @Override
@@ -137,7 +146,7 @@ public class ProductDomainService implements ProductUseCase {
         repository.findById(productId)
                 .ifPresentOrElse(
                     p -> repository.updateCurrentStock(productId, newStock),
-                    () -> { throw new NotFoundException("Cannot sync stock: product not found with ID: " + productId); }
+                    () -> LOG.warnf("syncCurrentStock skipped — product not found id=%d", productId)
                 );
     }
 

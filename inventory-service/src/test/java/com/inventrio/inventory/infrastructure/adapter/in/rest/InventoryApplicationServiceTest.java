@@ -91,4 +91,28 @@ public class InventoryApplicationServiceTest {
         assertEquals(10, result.get(0).quantityChange());
         assertEquals("ENTRY", result.get(0).movementType());
     }
+
+    @Test
+    void adjustStock_exitType_mapsCorrectly() {
+        AdjustStockRequest request = new AdjustStockRequest(2L, 5, "EXIT");
+        Inventory updated = Inventory.builder()
+                .id(2L).productId(2L).quantity(45)
+                .name("Mouse").price(new BigDecimal("25.00")).category("Peripherals")
+                .build();
+        when(useCase.adjustStock(2L, 5, MovementType.EXIT)).thenReturn(updated);
+
+        InventoryResponse response = service.adjustStock(request);
+
+        assertEquals(45, response.quantity());
+        verify(useCase).adjustStock(2L, 5, MovementType.EXIT);
+    }
+
+    @Test
+    void getMovements_emptyList_returnsEmpty() {
+        when(useCase.getMovements(99L, 0, 20)).thenReturn(List.of());
+
+        List<InventoryMovementResponse> result = service.getMovements(99L, 0, 20);
+
+        assertEquals(0, result.size());
+    }
 }
