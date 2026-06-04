@@ -352,6 +352,13 @@ Colección preconfigurada en la raíz del proyecto: `inventrio_postman_collectio
 3. Ejecuta primero **Autenticación (Keycloak) → Obtener Token Admin** y **Obtener Token User**. Los scripts de test guardan automáticamente los tokens en `admin_token` y `user_token`.
 4. Todos los demás requests usan esas variables automáticamente.
 
+### Credenciales
+
+| Rol | Usuario | Contraseña |
+| :--- | :--- | :--- |
+| Admin | `admin` | `admin123` |
+| User | `user` | `user123` |
+
 ### Requests incluidos
 
 | Carpeta | Request |
